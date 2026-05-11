@@ -236,9 +236,13 @@ class GameScreen(Screen):
         # Render arena
         try:
             rendered = self.game.render_system.render()
-            self.query_one("#arena-view", Static).update(str(rendered))
+            arena_widget = self.query_one("#arena-view", Static)
+            if arena_widget:
+                arena_widget.update(str(rendered))
         except Exception as e:
-            self.query_one("#arena-view", Static).update(f"Error: {e}")
+            arena_widget = self.query_one("#arena-view", Static)
+            if arena_widget:
+                arena_widget.update(f"Error: {e}")
         
         # Update HUD
         try:
@@ -266,8 +270,13 @@ class GameScreen(Screen):
                 hp, max_hp = 50, 50
                 en, max_en = 30, 30
             
-            self.query_one("#hp-bar", Static).update(f"HP: {hp}/{max_hp}")
-            self.query_one("#energy-bar", Static).update(f"EN: {en}/{max_en}")
+            hp_widget = self.query_one("#hp-bar", Static)
+            if hp_widget:
+                hp_widget.update(f"HP: {hp}/{max_hp}")
+                
+            en_widget = self.query_one("#energy-bar", Static)
+            if en_widget:
+                en_widget.update(f"EN: {en}/{max_en}")
             
             # Update skills from character data
             char_info = CHARACTER_DATA.get(player_data.character_id)
@@ -277,14 +286,18 @@ class GameScreen(Screen):
                     skill_id = skill_map.get(key, '---')
                     widget_id = f"skill-{key}"
                     try:
-                        self.query_one(f"#{widget_id}", Static).update(f"{key.upper()}: {skill_id}")
+                        skill_widget = self.query_one(f"#{widget_id}", Static)
+                        if skill_widget:
+                            skill_widget.update(f"{key.upper()}: {skill_id}")
                     except Exception:
                         pass
             
             # Wave info
             wave = self.game.wave_director.state.current_wave
             remaining = len([e for e in self.game.em.entities if self.game.em.has_component(e, 'ai')])
-            self.query_one("#wave-info", Static).update(f"Wave: {wave} | Enemies: {remaining}")
+            wave_widget = self.query_one("#wave-info", Static)
+            if wave_widget:
+                wave_widget.update(f"Wave: {wave} | Enemies: {remaining}")
         except Exception as e:
             pass
 
@@ -375,46 +388,69 @@ class TurnboundApp(App):
     selected_character: str = "executioner"
 
     CSS = """
+    Screen {
+        background: #0a0a0f;
+    }
+    
     #main-container {
         align: center middle;
         height: 100%;
+        width: 100%;
     }
 
     #title {
-        color: $primary;
+        color: #ff6b6b;
         text-align: center;
         margin-bottom: 1;
+        text-style: bold;
     }
 
     #subtitle {
         text-align: center;
-        color: $error;
+        color: #ff0000;
         margin-bottom: 2;
+        text-style: bold;
+    }
+    
+    #decorations {
+        text-align: center;
+        color: #663399;
+        margin-bottom: 1;
     }
 
     #menu {
         align: center middle;
         width: 30;
+        height: auto;
+    }
+    
+    #menu Button {
+        width: 100%;
+        margin: 1 0;
     }
 
     #game-container {
         layout: horizontal;
         height: 100%;
+        width: 100%;
+        padding: 0;
     }
 
     #arena-view {
         width: 75%;
         height: 100%;
-        border: solid $primary;
+        border: solid #4a4a6a;
         content-align: left top;
         overflow: hidden;
+        background: #0d0d15;
     }
 
     #hud {
         width: 25%;
         height: 100%;
-        border: solid $secondary;
+        border: solid #4a4a6a;
         padding: 1;
+        background: #0d0d15;
     }
 
     #stats-row, #skills-row {
@@ -423,13 +459,26 @@ class TurnboundApp(App):
     }
 
     #hp-bar {
-        color: $error;
+        color: #ff4444;
         width: 50%;
+        text-style: bold;
     }
 
     #energy-bar {
-        color: $warning;
+        color: #44aaff;
         width: 50%;
+        text-style: bold;
+    }
+    
+    #wave-info {
+        color: #aaaaaa;
+        margin-top: 1;
+        margin-bottom: 1;
+    }
+    
+    #combat-log {
+        color: #888888;
+        height: 1fr;
     }
 
     #pause-container {
@@ -440,33 +489,54 @@ class TurnboundApp(App):
     #pause-title {
         text-align: center;
         margin-bottom: 2;
+        color: #ffff00;
+        text-style: bold;
+    }
+    
+    #pause-menu {
+        align: center middle;
+        width: 30;
+    }
+    
+    #pause-menu Button {
+        width: 100%;
+        margin: 1 0;
     }
 
     #char-container {
         align: center middle;
         height: 100%;
+        width: 100%;
     }
 
     #select-title {
         text-align: center;
         margin-bottom: 2;
-        color: $primary;
+        color: #ff6b6b;
+        text-style: bold;
     }
 
     #character-list {
         width: 40;
         height: auto;
-        border: solid $secondary;
+        border: solid #4a4a6a;
         padding: 1;
+        background: #0d0d15;
+    }
+    
+    #character-list Button {
+        width: 100%;
+        margin: 1 0;
     }
 
     #character-preview {
         width: 60;
         height: auto;
-        border: solid $primary;
+        border: solid #663399;
         padding: 1;
         margin-top: 1;
         content-align: left top;
+        background: #0d0d15;
     }
 
     #char-container Vertical {

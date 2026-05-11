@@ -1,1 +1,4 @@
-(src/ui/game_screen.py)
+```
+__pycache__/
+*.pyc
+```
