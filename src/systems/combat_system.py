@@ -1,7 +1,7 @@
 """Combat system for TURNBOUND."""
 
 import random
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from src.core.constants import (
     BASE_CRIT_CHANCE,
@@ -16,6 +16,8 @@ from src.core.event_bus import GameEvent, EventBus
 
 if TYPE_CHECKING:
     from src.ecs.entity_manager import EntityManager
+    from src.systems.upgrade_system import UpgradeSystem
+    from src.content.skills import Skill
 
 
 class CombatSystem:
@@ -24,6 +26,11 @@ class CombatSystem:
     def __init__(self, entity_manager: "EntityManager", event_bus: EventBus):
         self.em = entity_manager
         self.event_bus = event_bus
+        self.upgrade_system: Optional["UpgradeSystem"] = None
+    
+    def set_upgrade_system(self, upgrade_system: "UpgradeSystem") -> None:
+        """Set the upgrade system reference."""
+        self.upgrade_system = upgrade_system
 
     def calculate_damage(
         self,
@@ -31,6 +38,7 @@ class CombatSystem:
         target_id: int,
         base_damage: int,
         damage_type: str = DAMAGE_PHYSICAL,
+        skill: Optional["Skill"] = None,
     ) -> tuple[int, bool]:
         """
         Calculate final damage after all modifiers.
@@ -54,9 +62,20 @@ class CombatSystem:
         power = attacker_stats.power
         defense = target_stats.defense
 
+        # Apply upgrade system modifiers
+        if self.upgrade_system:
+            power = int(power * self.upgrade_system.get_stat("power", 1.0))
+            defense = int(defense * self.upgrade_system.get_stat("defense", 1.0))
+
         # Check for critical hit
         crit_chance = attacker_stats.crit_chance
         is_crit = random.random() < crit_chance
+        
+        # Check for guaranteed crit status
+        if target_statuses and target_statuses.has("guaranteed_crit"):
+            is_crit = True
+            target_statuses.remove("guaranteed_crit")
+        
         crit_multiplier = attacker_stats.crit_multiplier if is_crit else 1.0
 
         # Apply vulnerability status
@@ -73,6 +92,11 @@ class CombatSystem:
 
         # Apply damage type modifiers
         final_damage = self._apply_type_modifiers(final_damage, damage_type, target_statuses)
+        
+        # Apply upgrade damage modifiers
+        if self.upgrade_system:
+            modifier = self.upgrade_system.get_damage_modifier(damage_type)
+            final_damage = int(final_damage * modifier)
 
         return (final_damage, is_crit)
 
