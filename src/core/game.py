@@ -11,7 +11,9 @@ from src.generation.arena_generator import Arena, ArenaGenerator
 from src.systems.combat_system import CombatSystem
 from src.systems.movement_system import MovementSystem
 from src.systems.wave_system import WaveDirector
+from src.systems.upgrade_system import UpgradeSystem
 from src.render.renderer import RenderSystem
+from src.animation.effects import AnimationSystem
 
 if TYPE_CHECKING:
     from src.systems.ai_system import AISystem
@@ -67,6 +69,7 @@ class Game:
             self.config.screen_width,
             self.config.screen_height
         )
+        self.animation_system = AnimationSystem()
 
         # Arena
         self.arena_generator = ArenaGenerator(
@@ -77,6 +80,9 @@ class Game:
 
         # Wave system
         self.wave_director = WaveDirector(self.em)
+        
+        # Upgrade system
+        self.upgrade_system: Optional[UpgradeSystem] = None
 
         # AI system (initialized after movement/combat)
         self.ai_system: Optional["AISystem"] = None
@@ -84,6 +90,7 @@ class Game:
         # Game timing
         self._running = False
         self._turn_count = 0
+        self._boss_active = False
 
         # Setup render layers
         self._setup_render_layers()
@@ -129,6 +136,10 @@ class Game:
         # Set up movement system with arena obstacles
         self.movement_system.set_solid_tiles(self.current_arena.obstacles)
 
+        # Initialize upgrade system
+        self.upgrade_system = UpgradeSystem(self)
+        self.combat_system.set_upgrade_system(self.upgrade_system)
+
         # Create player entity
         self._create_player(character_id)
 
@@ -142,6 +153,7 @@ class Game:
         self.state = GameState.PLAYING
         self._running = True
         self._turn_count = 0
+        self._boss_active = False
 
     def _create_player(self, character_id: str) -> None:
         """Create player entity."""
@@ -150,6 +162,7 @@ class Game:
             Skills, Cooldowns, Statuses, Faction, Tags, Level, Movement
         )
         from src.core.constants import FACTION_PLAYER
+        from src.content.characters import get_character
 
         entity_id = self.em.create_entity()
 
@@ -169,6 +182,12 @@ class Game:
         self.em.add_component(entity_id, Tags())
         self.em.add_component(entity_id, Level())
         self.em.add_component(entity_id, Movement())
+
+        # Apply character template if specified
+        character = get_character(character_id)
+        if character:
+            from src.content.characters import apply_character_template
+            apply_character_template(self.em, entity_id, character)
 
         return entity_id
 
