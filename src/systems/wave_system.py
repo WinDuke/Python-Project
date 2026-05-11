@@ -48,6 +48,22 @@ class WaveDirector:
         self.state = WaveState()
         self._enemy_templates: Dict[str, EnemyTemplate] = {}
         self._rng = random.Random()
+        
+        # Auto-register all enemies from content
+        self._auto_register_enemies()
+    
+    def _auto_register_enemies(self) -> None:
+        """Automatically register all enemy types from content."""
+        from src.content.enemies import ALL_ENEMIES
+        
+        for enemy_id, enemy_data in ALL_ENEMIES.items():
+            template = EnemyTemplate(
+                entity_type=enemy_id,
+                threat_cost=enemy_data.threat_cost,
+                min_wave=1,
+                max_wave=999,
+            )
+            self.register_enemy(template)
 
     def register_enemy(self, template: EnemyTemplate) -> None:
         """Register an enemy type for wave generation."""
