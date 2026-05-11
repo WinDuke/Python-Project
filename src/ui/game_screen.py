@@ -185,6 +185,10 @@ class GameScreen(Screen):
 
     game: Optional[Game] = None
 
+    def __init__(self, character_id: str = "executioner"):
+        super().__init__()
+        self.character_id = character_id
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         yield Container(
@@ -214,8 +218,8 @@ class GameScreen(Screen):
 
     def on_mount(self) -> None:
         """Initialize game when screen is mounted."""
-        # Get selected character from app
-        character_id = getattr(self.app, 'selected_character', 'executioner')
+        # Get selected character from instance or app
+        character_id = self.character_id or getattr(self.app, 'selected_character', 'executioner')
         
         # Create game instance
         config = GameConfig(
