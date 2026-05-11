@@ -356,7 +356,7 @@ class TurnboundMenu(App):
     #char-desc, #char-mechanic, #skills-header, #skills-list {
         width: 80%;
         content-align: left top;
-        margin: 0 10%;
+        margin: 0 12;
     }
     
     #select-title {
@@ -368,7 +368,7 @@ class TurnboundMenu(App):
     #sel-char-name, #sel-char-desc, #sel-char-mech {
         width: 80%;
         content-align: center top;
-        margin: 0 10%;
+        margin: 0 12;
     }
     
     #char-indicators {
