@@ -91,6 +91,12 @@ class Game:
         self._running = False
         self._turn_count = 0
         self._boss_active = False
+        
+        # Pending actions queue
+        self._pending_actions: list[tuple[str, dict]] = []
+        
+        # Callback for UI updates
+        self._on_turn_complete = None
 
         # Setup render layers
         self._setup_render_layers()
@@ -252,12 +258,13 @@ class Game:
     async def _process_player_action(self, action: str, data: dict) -> None:
         """Process player input action."""
         from src.core.constants import DIRECTIONS
+        from src.components import Position, Faction
 
         if action in DIRECTIONS:
             dx, dy = DIRECTIONS[action]
             player_entities = self.em.query(Position, Faction)
             for entity_id in player_entities:
-                faction = self.em.get_component(entity_id, type(__import__('src.components', fromlist=['Faction']).Faction))
+                faction = self.em.get_component(entity_id, Faction)
                 if faction and faction.faction_id == 0:
                     self.movement_system.move_entity(entity_id, dx, dy)
                     break
@@ -344,20 +351,26 @@ class Game:
         return False
 
     def handle_input(self, action: str, data: dict = None) -> None:
-        """Handle player input and process turn."""
-        import asyncio
+        """Handle player input and queue for processing."""
         
         if self.state != GameState.PLAYING:
             return
         
-        # Run the async process_turn in a blocking way for simple input handling
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        # Store input for processing by the async game loop
+        self._pending_actions.append((action, data or {}))
+    
+    async def process_pending_actions(self) -> None:
+        """Process all pending player actions."""
+        if not self._pending_actions or self.state != GameState.PLAYING:
+            return
         
-        loop.run_until_complete(self.process_turn(action, data))
+        # Process one action per frame (turn-based)
+        action, data = self._pending_actions.pop(0)
+        await self.process_turn(action, data)
+        
+        # Notify UI of turn completion
+        if self._on_turn_complete:
+            self._on_turn_complete()
 
     def quit(self) -> None:
         """Quit the game."""
