@@ -6,6 +6,12 @@ from textual.widget import Widget
 from textual.widgets import Header, Footer, Static, Button, Label
 from textual.binding import Binding
 from textual.screen import Screen
+from textual.reactive import reactive
+from typing import Optional, Dict, Any
+
+from src.core.game import Game, GameConfig, PlayerData
+from src.core.constants import ARENA_WIDTH, ARENA_HEIGHT
+from src.content.characters import ALL_CHARACTERS as CHARACTER_DATA
 
 
 class TitleScreen(Screen):
@@ -13,6 +19,7 @@ class TitleScreen(Screen):
 
     BINDINGS = [
         Binding("enter", "start_game", "Start Game"),
+        Binding("c", "select_character", "Characters"),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -42,15 +49,121 @@ class TitleScreen(Screen):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-start":
+            # Start with default character
+            self.app.selected_character = "executioner"
             self.app.push_screen("game_screen")
+        elif event.button.id == "btn-characters":
+            self.app.push_screen("character_select")
         elif event.button.id == "btn-exit":
             self.app.exit()
 
     def action_start_game(self) -> None:
+        self.app.selected_character = "executioner"
         self.app.push_screen("game_screen")
+
+    def action_select_character(self) -> None:
+        self.app.push_screen("character_select")
 
     def action_quit(self) -> None:
         self.app.exit()
+
+
+class CharacterSelectScreen(Screen):
+    """Character selection screen."""
+
+    BINDINGS = [
+        Binding("up", "navigate_up", "Up"),
+        Binding("down", "navigate_down", "Down"),
+        Binding("enter", "select", "Select"),
+        Binding("escape", "back", "Back"),
+    ]
+
+    selected_index: int = 0
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Container(
+            Static("[bold]SELECT YOUR CHARACTER[/bold]", id="select-title"),
+            Vertical(
+                id="character-list",
+            ),
+            Static("", id="character-preview"),
+            id="char-container",
+        )
+        yield Footer()
+
+    def on_mount(self) -> None:
+        """Populate character list."""
+        char_list = self.query_one("#character-list", Vertical)
+        # Clear existing children properly
+        for child in list(char_list.children):
+            child.remove()
+        
+        for i, (char_id, char_info) in enumerate(CHARACTER_DATA.items()):
+            btn = Button(
+                f"{char_info.name} - {char_info.title}",
+                id=f"char-{char_id}",
+                variant="default" if i != self.selected_index else "primary"
+            )
+            char_list.mount(btn)
+        
+        self._update_preview()
+
+    def _update_preview(self) -> None:
+        """Update character preview panel."""
+        chars = list(CHARACTER_DATA.items())
+        if chars:
+            char_id, char_info = chars[self.selected_index]
+            skills_text = "\n".join([f"  {slot.key}: {slot.skill_id}" for slot in char_info.skills])
+            preview = f"""[bold]{char_info.name}[/bold]
+[i]{char_info.title}[/i]
+
+[b]{char_info.description}[/b]
+
+Skills:
+{skills_text}
+
+Press ENTER to select"""
+            try:
+                self.query_one("#character-preview", Static).update(preview)
+            except Exception:
+                pass
+
+    def action_navigate_up(self) -> None:
+        chars = list(CHARACTER_DATA.keys())
+        if chars:
+            self.selected_index = (self.selected_index - 1) % len(chars)
+            self._update_buttons()
+            self._update_preview()
+
+    def action_navigate_down(self) -> None:
+        chars = list(CHARACTER_DATA.keys())
+        if chars:
+            self.selected_index = (self.selected_index + 1) % len(chars)
+            self._update_buttons()
+            self._update_preview()
+
+    def _update_buttons(self) -> None:
+        """Update button variants based on selection."""
+        chars = list(CHARACTER_DATA.keys())
+        for i, char_id in enumerate(chars):
+            try:
+                btn = self.query_one(f"#char-{char_id}", Button)
+                btn.variant = "primary" if i == self.selected_index else "default"
+            except Exception:
+                pass
+
+    def action_select(self) -> None:
+        """Select current character and start game."""
+        chars = list(CHARACTER_DATA.keys())
+        if chars:
+            selected_char = chars[self.selected_index]
+            self.app.selected_character = selected_char
+            self.app.pop_screen()  # Pop character select
+            self.app.push_screen("game_screen")  # Push game screen
+
+    def action_back(self) -> None:
+        self.app.pop_screen()
 
 
 class GameScreen(Screen):
@@ -69,6 +182,8 @@ class GameScreen(Screen):
         Binding("escape", "pause", "Pause"),
     ]
 
+    game: Optional[Game] = None
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         yield Container(
@@ -77,18 +192,18 @@ class GameScreen(Screen):
             # HUD
             Vertical(
                 Horizontal(
-                    Static("HP: 50/50", id="hp-bar"),
-                    Static("EN: 30/30", id="energy-bar"),
+                    Static("HP: --/--", id="hp-bar"),
+                    Static("EN: --/--", id="energy-bar"),
                     id="stats-row",
                 ),
                 Horizontal(
-                    Static("Q: Fireball", id="skill-q"),
-                    Static("W: Dash", id="skill-w"),
-                    Static("E: Nova", id="skill-e"),
-                    Static("R: Blink", id="skill-r"),
+                    Static("Q: ---", id="skill-q"),
+                    Static("W: ---", id="skill-w"),
+                    Static("E: ---", id="skill-e"),
+                    Static("R: ---", id="skill-r"),
                     id="skills-row",
                 ),
-                Static("Wave: 1 | Enemies: 0", id="wave-info"),
+                Static("Wave: -- | Enemies: --", id="wave-info"),
                 Static("", id="combat-log"),
                 id="hud",
             ),
@@ -98,39 +213,125 @@ class GameScreen(Screen):
 
     def on_mount(self) -> None:
         """Initialize game when screen is mounted."""
+        # Get selected character from app
+        character_id = getattr(self.app, 'selected_character', 'executioner')
+        
+        # Create game instance
+        config = GameConfig(
+            screen_width=80,
+            screen_height=24,
+            arena_width=ARENA_WIDTH,
+            arena_height=ARENA_HEIGHT,
+        )
+        self.game = Game(config)
+        self.game.new_game(character_id, "Player")
+        
         self._update_display()
 
     def _update_display(self) -> None:
         """Update the display with current game state."""
-        # This will be connected to the game engine
-        pass
+        if not self.game:
+            return
+        
+        # Render arena
+        try:
+            rendered = self.game.render_system.render()
+            self.query_one("#arena-view", Static).update(str(rendered))
+        except Exception as e:
+            self.query_one("#arena-view", Static).update(f"Error: {e}")
+        
+        # Update HUD
+        try:
+            player_data = self.game.player_data
+            player_entity = self.game.get_player_entity()
+            
+            # Get HP and Energy from entity components
+            if player_entity:
+                from src.components import Health, Energy
+                health = self.game.em.get_component(player_entity, Health)
+                energy = self.game.em.get_component(player_entity, Energy)
+                
+                if health:
+                    hp = health.current
+                    max_hp = health.maximum
+                else:
+                    hp, max_hp = 50, 50
+                    
+                if energy:
+                    en = energy.current
+                    max_en = energy.maximum
+                else:
+                    en, max_en = 30, 30
+            else:
+                hp, max_hp = 50, 50
+                en, max_en = 30, 30
+            
+            self.query_one("#hp-bar", Static).update(f"HP: {hp}/{max_hp}")
+            self.query_one("#energy-bar", Static).update(f"EN: {en}/{max_en}")
+            
+            # Update skills from character data
+            char_info = CHARACTER_DATA.get(player_data.character_id)
+            if char_info:
+                skill_map = {slot.key.lower(): slot.skill_id for slot in char_info.skills}
+                for key in ['q', 'w', 'e', 'r']:
+                    skill_id = skill_map.get(key, '---')
+                    widget_id = f"skill-{key}"
+                    try:
+                        self.query_one(f"#{widget_id}", Static).update(f"{key.upper()}: {skill_id}")
+                    except Exception:
+                        pass
+            
+            # Wave info
+            wave = self.game.wave_director.state.current_wave
+            remaining = len([e for e in self.game.em.entities if self.game.em.has_component(e, 'ai')])
+            self.query_one("#wave-info", Static).update(f"Wave: {wave} | Enemies: {remaining}")
+        except Exception as e:
+            pass
 
     def action_move_up(self) -> None:
-        self.app.notify("Move Up")
+        if self.game:
+            self.game.handle_input("up")
+            self._update_display()
 
     def action_move_down(self) -> None:
-        self.app.notify("Move Down")
+        if self.game:
+            self.game.handle_input("down")
+            self._update_display()
 
     def action_move_left(self) -> None:
-        self.app.notify("Move Left")
+        if self.game:
+            self.game.handle_input("left")
+            self._update_display()
 
     def action_move_right(self) -> None:
-        self.app.notify("Move Right")
+        if self.game:
+            self.game.handle_input("right")
+            self._update_display()
 
     def action_wait(self) -> None:
-        self.app.notify("Wait")
+        if self.game:
+            self.game.handle_input("wait")
+            self._update_display()
 
     def action_use_skill_q(self) -> None:
-        self.app.notify("Skill Q")
+        if self.game:
+            self.game.handle_input("q")
+            self._update_display()
 
     def action_use_skill_w(self) -> None:
-        self.app.notify("Skill W")
+        if self.game:
+            self.game.handle_input("w")
+            self._update_display()
 
     def action_use_skill_e(self) -> None:
-        self.app.notify("Skill E")
+        if self.game:
+            self.game.handle_input("e")
+            self._update_display()
 
     def action_use_skill_r(self) -> None:
-        self.app.notify("Skill R")
+        if self.game:
+            self.game.handle_input("r")
+            self._update_display()
 
     def action_pause(self) -> None:
         self.app.push_screen("pause_menu")
@@ -171,6 +372,8 @@ class PauseMenu(Screen):
 class TurnboundApp(App):
     """Main Textual application for TURNBOUND."""
 
+    selected_character: str = "executioner"
+
     CSS = """
     #main-container {
         align: center middle;
@@ -200,13 +403,15 @@ class TurnboundApp(App):
     }
 
     #arena-view {
-        width: 80%;
+        width: 75%;
         height: 100%;
         border: solid $primary;
+        content-align: left top;
+        overflow: hidden;
     }
 
     #hud {
-        width: 20%;
+        width: 25%;
         height: 100%;
         border: solid $secondary;
         padding: 1;
@@ -236,12 +441,44 @@ class TurnboundApp(App):
         text-align: center;
         margin-bottom: 2;
     }
+
+    #char-container {
+        align: center middle;
+        height: 100%;
+    }
+
+    #select-title {
+        text-align: center;
+        margin-bottom: 2;
+        color: $primary;
+    }
+
+    #character-list {
+        width: 40;
+        height: auto;
+        border: solid $secondary;
+        padding: 1;
+    }
+
+    #character-preview {
+        width: 60;
+        height: auto;
+        border: solid $primary;
+        padding: 1;
+        margin-top: 1;
+        content-align: left top;
+    }
+
+    #char-container Vertical {
+        align: center middle;
+    }
     """
 
     SCREENS = {
         "title_screen": TitleScreen,
         "game_screen": GameScreen,
         "pause_menu": PauseMenu,
+        "character_select": CharacterSelectScreen,
     }
 
     BINDINGS = [
