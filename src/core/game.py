@@ -343,6 +343,22 @@ class Game:
                 return health and not health.is_dead
         return False
 
+    def handle_input(self, action: str, data: dict = None) -> None:
+        """Handle player input and process turn."""
+        import asyncio
+        
+        if self.state != GameState.PLAYING:
+            return
+        
+        # Run the async process_turn in a blocking way for simple input handling
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        loop.run_until_complete(self.process_turn(action, data))
+
     def quit(self) -> None:
         """Quit the game."""
         self._running = False
