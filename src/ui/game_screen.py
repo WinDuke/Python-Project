@@ -304,26 +304,32 @@ class GameScreen(Screen):
     def action_move_up(self) -> None:
         if self.game:
             self.game.handle_input("up")
-            self._update_display()
+            asyncio.create_task(self._process_turn_and_update())
 
     def action_move_down(self) -> None:
         if self.game:
             self.game.handle_input("down")
-            self._update_display()
+            asyncio.create_task(self._process_turn_and_update())
 
     def action_move_left(self) -> None:
         if self.game:
             self.game.handle_input("left")
-            self._update_display()
+            asyncio.create_task(self._process_turn_and_update())
 
     def action_move_right(self) -> None:
         if self.game:
             self.game.handle_input("right")
-            self._update_display()
+            asyncio.create_task(self._process_turn_and_update())
 
     def action_wait(self) -> None:
         if self.game:
             self.game.handle_input("wait")
+            asyncio.create_task(self._process_turn_and_update())
+
+    async def _process_turn_and_update(self) -> None:
+        """Process pending actions and update display."""
+        if self.game:
+            await self.game.process_pending_actions()
             self._update_display()
 
     def action_use_skill_q(self) -> None:
