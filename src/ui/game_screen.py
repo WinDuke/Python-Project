@@ -40,7 +40,6 @@ class TitleScreen(Screen):
             Vertical(
                 Button("START GAME", id="btn-start", variant="primary"),
                 Button("CHARACTERS", id="btn-characters"),
-                Button("SETTINGS", id="btn-settings"),
                 Button("EXIT", id="btn-exit"),
                 id="menu",
             ),
