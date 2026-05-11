@@ -145,6 +145,9 @@ class Game:
         # Initialize upgrade system
         self.upgrade_system = UpgradeSystem(self)
         self.combat_system.set_upgrade_system(self.upgrade_system)
+        
+        # Register enemy templates with wave director
+        self._register_enemy_templates()
 
         # Create player entity
         self._create_player(character_id)

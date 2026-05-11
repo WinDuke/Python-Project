@@ -298,7 +298,7 @@ class GameScreen(Screen):
             
             # Wave info
             wave = self.game.wave_director.state.current_wave
-            remaining = len([e for e in self.game.em.entities if self.game.em.has_component(e, 'ai')])
+            remaining = len([e for e in self.game.em.get_all_entities() if self.game.em.has_component(e, 'ai')])
             wave_widget = self.query_one("#wave-info", Static)
             if wave_widget:
                 wave_widget.update(f"Wave: {wave} | Enemies: {remaining}")
