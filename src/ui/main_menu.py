@@ -251,23 +251,30 @@ class CharacterSelectScreen(Screen):
         return self.CHAR_ORDER[self.current_index]
     
     def compose(self) -> ComposeResult:
+        yield Static("[bold]SELECT YOUR CHAMPION[/]", id="select-title-chars")
+        yield self._create_char_display()
+        yield Footer()
+    
+    def _create_char_display(self) -> Static:
+        """Создает виджет с информацией о текущем персонаже."""
         char_id = self.current_char_id
         char_data = CharacterInfoScreen.CHARACTERS.get(char_id, CharacterInfoScreen.CHARACTERS["executioner"])
-        
-        yield Static("[bold]SELECT YOUR CHAMPION[/]", id="select-title")
-        yield Static(f"[bold {char_data['color']}]{char_data['name']}[/]", id="sel-char-name")
-        yield Static(f"[italic]{char_data['desc']}[/]", id="sel-char-desc")
-        yield Static(f"[bold]Mechanic:[/] {char_data['mechanic']}", id="sel-char-mech")
         
         # Индикатор выбора
         indicators = "  ".join([
             f"[{'bold ' + (char_data['color'] if i == self.current_index else 'dim')}]{CharacterInfoScreen.CHARACTERS[c]['name'].split()[1]}[/]"
             for i, c in enumerate(self.CHAR_ORDER)
         ])
-        yield Static(f"\n{indicators}", id="char-indicators")
         
-        yield Static("\n[dim]← → to change | ENTER to start | ESC to go back[/]", id="sel-hint")
-        yield Footer()
+        content = f"""[bold {char_data['color']}]{char_data['name']}[/]
+[italic]{char_data['desc']}[/]
+[bold]Mechanic:[/] {char_data['mechanic']}
+
+{indicators}
+
+[dim]← → to change | ENTER to start | ESC to go back[/]"""
+        
+        return Static(content, id="char-display-chars")
     
     def action_prev_char(self) -> None:
         self.current_index = (self.current_index - 1) % len(self.CHAR_ORDER)
@@ -287,14 +294,11 @@ class CharacterSelectScreen(Screen):
         self.app.pop_screen()
     
     def _refresh_display(self) -> None:
-        """Перерисовка экрана при смене персонажа."""
-        # Удаляем все виджеты кроме Footer и пересоздаем
-        for widget in list(self.walk_children()):
-            if isinstance(widget, Footer):
-                continue
-            widget.remove()
-        # Пересоздаем контент
-        self.mount_all(list(self.compose()))
+        """Обновляет отображение при смене персонажа."""
+        # Находим виджет с информацией и обновляем его содержимое
+        display_widget = self.query_one("#char-display-chars", Static)
+        if display_widget:
+            display_widget.update(self._create_char_display().render())
 
 
 class BestiaryScreen(Screen):
@@ -324,13 +328,14 @@ class TurnboundMenu(App):
     }
 
     #main-container {
-        width: 100%;
-        height: 100%;
+        width: 60;
+        height: auto;
         align: center middle;
+        padding: 1 2;
     }
 
     #menu-list {
-        margin-top: 2;
+        margin-top: 1;
         width: auto;
         align: center middle;
     }
@@ -338,54 +343,53 @@ class TurnboundMenu(App):
     MenuOption {
         width: 40;
         content-align: center middle;
-        margin: 1;
+        margin: 1 0;
         height: 1;
     }
 
     #version {
         color: #662222;
         margin-top: 1;
+        text-align: center;
     }
     
-    #char-title, #sel-char-name {
+    /* Character Info Screen */
+    #char-title {
         width: 100%;
         content-align: center top;
         margin-bottom: 1;
     }
     
     #char-desc, #char-mechanic, #skills-header, #skills-list {
-        width: 80%;
+        width: 90%;
         content-align: left top;
-        margin: 0 12;
+        margin: 0 2;
     }
     
-    #select-title {
+    /* Character Select Screen */
+    #select-title-chars {
         width: 100%;
         content-align: center top;
-        margin-bottom: 2;
+        margin-bottom: 1;
     }
     
-    #sel-char-name, #sel-char-desc, #sel-char-mech {
-        width: 80%;
-        content-align: center top;
-        margin: 0 12;
+    #char-display-chars {
+        width: 90%;
+        content-align: left top;
+        margin: 0 2;
     }
     
-    #char-indicators {
-        width: 100%;
-        content-align: center middle;
-        margin: 2 0;
-    }
-    
+    /* Bestiary Screen */
     #bestiary-title {
         width: 100%;
         content-align: center top;
-        margin-bottom: 2;
+        margin-bottom: 1;
     }
     
     #bestiary-content {
-        width: 60%;
+        width: 80%;
         content-align: center middle;
+        margin: 1 0;
     }
     """
 
