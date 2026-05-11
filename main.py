@@ -6,9 +6,9 @@ import sys
 
 def run_game() -> None:
     """Run the game with Textual UI."""
-    from src.ui.game_screen import TitleScreen
+    from src.ui.game_screen import TurnboundApp
     
-    app = TitleScreen()
+    app = TurnboundApp()
     app.run()
 
 
