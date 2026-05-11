@@ -1,5 +1,6 @@
 """Textual UI for TURNBOUND."""
 
+import asyncio
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical, Horizontal
 from textual.widget import Widget
@@ -304,53 +305,56 @@ class GameScreen(Screen):
     def action_move_up(self) -> None:
         if self.game:
             self.game.handle_input("up")
-            asyncio.create_task(self._process_turn_and_update())
+            self.call_later(self._sync_process_turn_and_update)
 
     def action_move_down(self) -> None:
         if self.game:
             self.game.handle_input("down")
-            asyncio.create_task(self._process_turn_and_update())
+            self.call_later(self._sync_process_turn_and_update)
 
     def action_move_left(self) -> None:
         if self.game:
             self.game.handle_input("left")
-            asyncio.create_task(self._process_turn_and_update())
+            self.call_later(self._sync_process_turn_and_update)
 
     def action_move_right(self) -> None:
         if self.game:
             self.game.handle_input("right")
-            asyncio.create_task(self._process_turn_and_update())
+            self.call_later(self._sync_process_turn_and_update)
 
     def action_wait(self) -> None:
         if self.game:
             self.game.handle_input("wait")
-            asyncio.create_task(self._process_turn_and_update())
+            self.call_later(self._sync_process_turn_and_update)
 
-    async def _process_turn_and_update(self) -> None:
-        """Process pending actions and update display."""
+    def _sync_process_turn_and_update(self) -> None:
+        """Synchronous wrapper to process turn and update display."""
         if self.game:
-            await self.game.process_pending_actions()
-            self._update_display()
+            # Use run_async from Textual to properly handle async calls
+            async def process():
+                await self.game.process_pending_actions()
+                self._update_display()
+            self.run_worker(process())
 
     def action_use_skill_q(self) -> None:
         if self.game:
             self.game.handle_input("q")
-            self._update_display()
+            self.call_later(self._sync_process_turn_and_update)
 
     def action_use_skill_w(self) -> None:
         if self.game:
             self.game.handle_input("w")
-            self._update_display()
+            self.call_later(self._sync_process_turn_and_update)
 
     def action_use_skill_e(self) -> None:
         if self.game:
             self.game.handle_input("e")
-            self._update_display()
+            self.call_later(self._sync_process_turn_and_update)
 
     def action_use_skill_r(self) -> None:
         if self.game:
             self.game.handle_input("r")
-            self._update_display()
+            self.call_later(self._sync_process_turn_and_update)
 
     def action_pause(self) -> None:
         self.app.push_screen("pause_menu")
