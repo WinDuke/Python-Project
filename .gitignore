@@ -1,18 +1,1 @@
-```
-# Compiled Python files
-*.pyc
-__pycache__/
-
-# Dependencies
-.venv/
-venv/
-node_modules/
-
-# Logs and temp files
-*.log
-*.tmp
-
-# Editors
-.vscode/
-.idea/
-```
+Nothing should be ignored based on the provided file changes. The only modified file is a Python source file (`src/ui/main_menu.py`), which should not be added to .gitignore.
